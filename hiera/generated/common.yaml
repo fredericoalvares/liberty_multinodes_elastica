@@ -1,0 +1,8 @@
+---
+classes:
+- xp
+- xp::locales
+scenario::openstack::admin_password: admin
+scenario::openstack::controller_public_address: 172.16.48.4
+scenario::openstack::storage_public_address: 172.16.48.4
+scenario::openstack::network: 172.16.48.0/20
