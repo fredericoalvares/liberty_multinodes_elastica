@@ -1,12 +1,11 @@
-# scenario : liberty_multinodes
+# scenario : liberty_multinodes_elastica
 
 This scenario install Openstack Liberty on multiple nodes using the following topology.
 
-* 1 Controller node --- hosts core services, MySQL database and RabbitMQ
-* 1 Storage node --- hosts glance service
-* 1 Network node --- hosts the cloud router
+* 1 puppet server
+* 1 Controller node --- hosts core services, MySQL database, RabbitMQ, glance service, cloud router and gatling injector
 * n compute nodes --- host virtual servers
-
+* n-1 injectors --- hosts gatling load injector
 
 Nodes         | Description         | Puppet recipe
 --------------|-------------------- | -------------
@@ -15,37 +14,26 @@ Storage       | Glance API + backend| `puppet/modules/scenario/manifests/storage
 Network       | Routing node        | `puppet/modules/scenario/manifests/network.pp`
 Compute       | Hypervisor          | `puppet/modules/scenario/manifests/compute.pp`
 
-__Notes__ :
-
-This scenario can be deployed on nodes having **two network interfaces**. One is used for API
-communication with Openstack (tagged public interface in the puppet code), the other
-is used for VM traffic communication (tagged private interface in the puppet code).
-
 ## Optionnal ```xp.conf``` parameters
 
 The following parameters are optionnal in the ```xp.conf``` file. If some are not set,
 default values will bet set for them (see ```tasks/scenario.rb```). Here is an example :
 
 ```
+site	   'rennes'
 cluster    'parasilo'
 vlantype   'kavlan'
 computes   3
-interfaces 2
 ```
 
 __Notes__ :  
 
-* The total number of nodes used by the deployment is ```computes + 4```
-* The number of interfaces to use can be set to 1 or 2 (values above aren't supported) yet : using 1 interface allows you to deploy anywhere on Grid'5000. When using two interfaces the second one will be use for intra-vm communication and will be set on a dedicated vlan.
-
-
+* The total number of nodes used by the deployment is ```2*computes + 1```
 
 ## Openstack configuration
 
-* By default 2 images are added to Glance :
-  * [Cirros](http://download.cirros-cloud.net/0.3.4)
-  * [Debian 8](http://cdimage.debian.org/cdimage/openstack/)
-* A flavor `m1.xs` is created in order to use Debian 8 images.
+* By default 1 images are added to Glance :
+  * [Ubuntu](https://cloud-images.ubuntu.com/releases/12.04.4/release-20120424/ubuntu-12.04-server-cloudimg-amd64-disk1.img)
 * SSH and ICMP are allowed in the default security group.
 * Network configuration :
   * Create __private__ and __public__ networks.

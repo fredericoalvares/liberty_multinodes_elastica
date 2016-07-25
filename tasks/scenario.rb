@@ -5,14 +5,14 @@
 # Override OAR resources (tasks/jobs.rb)
 # We uses 2 nodes (1 puppetserver and 1 controller) and a subnet for floating public IPs
 #
-XP5K::Config[:jobname]    ||= '[openstack]liberty_multinode_elastica'
+XP5K::Config[:jobname]    ||= '[openstack] elastica'
 XP5K::Config[:site]       ||= 'rennes'
 XP5K::Config[:walltime]   ||= '1:00:00'
 XP5K::Config[:cluster]    ||= ''
 XP5K::Config[:vlantype]   ||= 'kavlan-local'
 XP5K::Config[:computes]   ||= 1
-XP5K::Config[:interfaces] ||= 1
-XP5K::Config[:injectors]  ||= 1
+#XP5K::Config[:interfaces] ||= 1
+#XP5K::Config[:injectors]  ||= 1
 XP5K::Config[:elastica_home] ||= "#{ENV['HOME']}/elastica"
 
 XP5K::Config[:elastica_env] = {:PROJECT_PATH=>"/share"}
@@ -22,10 +22,10 @@ oar_cluster = "and cluster='" + XP5K::Config[:cluster] + "'" if !XP5K::Config[:c
 # vlan reservation 
 # the first interface is put in the production network
 # the other ones are put a dedicated vlan thus we need #interfaces - 1 vlans
-oar_vlan = ""
-oar_vlan = "{type='#{XP5K::Config[:vlantype]}'}/vlan=#{XP5K::Config[:interfaces] - 1}" if XP5K::Config[:interfaces] >= 2
+#oar_vlan = ""
+#oar_vlan = "{type='#{XP5K::Config[:vlantype]}'}/vlan=#{XP5K::Config[:interfaces] - 1}" if XP5K::Config[:interfaces] >= 2
 
-nodes = 2 + XP5K::Config[:computes].to_i + XP5K::Config[:injectors].to_i
+nodes = 2 + XP5K::Config[:computes].to_i + XP5K::Config[:computes].to_i - 1
 
 
 resources = [] << %{{type='#{XP5K::Config[:vlantype]}'}/vlan=1+{virtual != 'none' #{oar_cluster}}/nodes=#{nodes}+slash_22=1,walltime=#{XP5K::Config[:walltime]}}
@@ -60,10 +60,10 @@ resources = [] << %{{type='#{XP5K::Config[:vlantype]}'}/vlan=1+{virtual != 'none
 
 @job_def[:roles] << XP5K::Role.new({
   name: 'injector',
-  size: XP5K::Config[:injectors].to_i
+  size: XP5K::Config[:computes].to_i - 1 # XP5K::Config[:injectors].to_i
 })
 
-G5K_NETWORKS = YAML.load_file("scenarios/liberty_multinodes_elastica/g5k_networks.yml")
+G5K_NETWORKS = YAML.load_file("scenarios/#{XP5K::Config[:scenario]}/g5k_networks.yml")
 
 # Override role 'all' (tasks/roles.rb)
 #
@@ -263,11 +263,11 @@ namespace :scenario do
       os = %x[uname].chomp
       case os
       when 'Linux'
-        sh %{sed -i '24s/apache2/httpd/' scenarios/liberty_multinodes_elastica/puppet/modules-openstack/horizon/manifests/params.pp}
-        sh %{sed -i 's/F78372A06FF50C80464FC1B4F7B8CEA6056E8E56/0A9AF2115F4687BD29803A206B73A36E6026DFCA/' scenarios/liberty_multinodes_elastica/puppet/modules-openstack/rabbitmq/manifests/repo/apt.pp}
+        sh %{sed -i '24s/apache2/httpd/' scenarios/#{XP5K::Config[:scenario]}/puppet/modules-openstack/horizon/manifests/params.pp}
+        sh %{sed -i 's/F78372A06FF50C80464FC1B4F7B8CEA6056E8E56/0A9AF2115F4687BD29803A206B73A36E6026DFCA/' scenarios/#{XP5K::Config[:scenario]}/puppet/modules-openstack/rabbitmq/manifests/repo/apt.pp}
       when 'Darwin'
-        sh %{sed -i '' '24s/apache2/httpd/' scenarios/liberty_multinodes_elastica/puppet/modules-openstack/horizon/manifests/params.pp}
-        sh %{sed -i '' 's/F78372A06FF50C80464FC1B4F7B8CEA6056E8E56/0A9AF2115F4687BD29803A206B73A36E6026DFCA/' scenarios/liberty_multinodes_elastica/puppet/modules-openstack/rabbitmq/manifests/repo/apt.pp}
+        sh %{sed -i '' '24s/apache2/httpd/' scenarios/#{XP5K::Config[:scenario]}/puppet/modules-openstack/horizon/manifests/params.pp}
+        sh %{sed -i '' 's/F78372A06FF50C80464FC1B4F7B8CEA6056E8E56/0A9AF2115F4687BD29803A206B73A36E6026DFCA/' scenarios/#{XP5K::Config[:scenario]}/puppet/modules-openstack/rabbitmq/manifests/repo/apt.pp}
       else
         puts "Patch not applied."
       end
@@ -381,7 +381,7 @@ puts "#{XP5K::Config[:openstack_env].class}"
      tmp_env = XP5K::Config[:openstack_env].merge(XP5K::Config[:elastica_env])
      on(roles('controller'), user: 'root', environment: tmp_env) do
 	 cmd = []
-         (1..XP5K::Config[:injectors].to_i).each do |i|
+         (1..XP5K::Config[:computes].to_i).each do |i|
                 compute = roles('compute').at(i-1)
 
 		puts "#{XP5K::Config[:openstack_env]}"
