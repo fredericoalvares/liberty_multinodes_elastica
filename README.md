@@ -5,7 +5,7 @@ This scenario install Openstack Liberty on multiple nodes using the following to
 * 1 puppet server
 * 1 Controller node --- hosts core services, MySQL database, RabbitMQ, glance service, cloud router and gatling injector
 * n compute nodes --- host virtual servers
-* n-1 injectors --- hosts gatling load injector
+* n injectors --- hosts gatling load injector
 
 Nodes         | Description         | Puppet recipe
 --------------|-------------------- | -------------

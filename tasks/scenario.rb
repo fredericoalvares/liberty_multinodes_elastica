@@ -6,9 +6,10 @@
 # We uses 2 nodes (1 puppetserver and 1 controller) and a subnet for floating public IPs
 #
 XP5K::Config[:jobname]    ||= '[openstack] elastica'
-XP5K::Config[:site]       ||= 'rennes'
+XP5K::Config[:site]       ||= 'lyon'
 XP5K::Config[:walltime]   ||= '1:00:00'
-XP5K::Config[:cluster]    ||= ''
+XP5K::Config[:cluster]    ||= 'taurus'
+XP5K::Config[:management_cluster] ||= 'sagittaire'
 XP5K::Config[:vlantype]   ||= 'kavlan-local'
 XP5K::Config[:computes]   ||= 1
 #XP5K::Config[:interfaces] ||= 1
@@ -19,28 +20,63 @@ XP5K::Config[:elastica_env] = {:PROJECT_PATH=>"/share"}
 
 oar_cluster = ""
 oar_cluster = "and cluster='" + XP5K::Config[:cluster] + "'" if !XP5K::Config[:cluster].empty?
+
+
+
 # vlan reservation 
 # the first interface is put in the production network
 # the other ones are put a dedicated vlan thus we need #interfaces - 1 vlans
 #oar_vlan = ""
-#oar_vlan = "{type='#{XP5K::Config[:vlantype]}'}/vlan=#{XP5K::Config[:interfaces] - 1}" if XP5K::Config[:interfaces] >= 2
+oar_vlan = "{type='#{XP5K::Config[:vlantype]}'}/vlan=1" 
 
-nodes = 2 + XP5K::Config[:computes].to_i + XP5K::Config[:computes].to_i - 1
+compute_nodes = XP5K::Config[:computes].to_i 
+management_nodes = 2 + XP5K::Config[:computes].to_i 
+
+oar_cluster = "{type='#{XP5K::Config[:vlantype]}'}/vlan=1+{virtual != 'none' and cluster='#{XP5K::Config[:cluster]}'}/nodes=#{compute_nodes}+slash_22=1,{cluster='#{XP5K::Config[:management_cluster]}'}/nodes=#{management_nodes},walltime=#{XP5K::Config[:walltime]}"
+
+#oar_cluster = "{type='#{XP5K::Config[:vlantype]}'}/vlan=1+{virtual != 'none' and cluster='#{XP5K::Config[:management_cluster]}'}/nodes=#{management_nodes}+slash_22=1,walltime=#{XP5K::Config[:walltime]}"
+
+#puts oar_cluster
+
+#resources = [] << %{{type='#{XP5K::Config[:vlantype]}'}/vlan=1+{virtual != 'none' and #{XP5K::Config[:cluster]}/nodes=#{nodes_compute}+slash_22=1,,walltime=#{XP5K::Config[:walltime]}}
+
+resources = [] << %{#{oar_cluster}}
+#nodes = 1
+
+#resources = [] << %{{type='#{XP5K::Config[:vlantype]}'}/vlan=1+{virtual != 'none' #{oar_cluster}}/nodes=#{nodes}+slash_22=1,walltime=#{XP5K::Config[:walltime]}}
+
+ 
+#{type='#{XP5K::Config[:vlantype]}'}/vlan=1+{virtual != 'none' and #{XP5K::Config[:cluster]}/nodes=#{nodes_compute}+slash_22=1,,walltime=#{XP5K::Config[:walltime]}}
 
 
-resources = [] << %{{type='#{XP5K::Config[:vlantype]}'}/vlan=1+{virtual != 'none' #{oar_cluster}}/nodes=#{nodes}+slash_22=1,walltime=#{XP5K::Config[:walltime]}}
 
 #resources = [] << 
 #[ 
 #  "#{oar_vlan}",
-#  "{eth_count >= #{XP5K::Config[:interfaces]} and virtual != 'none' #{oar_cluster}}/nodes=#{nodes}",
+#  "#{oar_cluster}",
 #  "slash_22=1, walltime=#{XP5K::Config[:walltime]}"
 #].join("+")
+#
+#roles = []
+#XP5K::Config['clusters'].each do |cluster|
+#  roles << XP5K::Role.new({
+#    :name    => "controller",
+#    :size    => 1,
+#    :pattern => cluster['name']
+#  })
+#  roles << XP5K::Role.new({
+#    :name => "ceph_monitor_#{cluster['name']}",
+#    :size => 1,
+#    :inner => "ceph_nodes_#{cluster['name']}"
+#  })
+#end
+#
 
 @job_def[:resources] = resources
 @job_def[:roles] << XP5K::Role.new({
   name: 'controller',
-  size: 1
+  size: 1,
+  pattern: XP5K::Config[:management_cluster]
 })
 
 #@job_def[:roles] << XP5K::Role.new({
@@ -55,12 +91,14 @@ resources = [] << %{{type='#{XP5K::Config[:vlantype]}'}/vlan=1+{virtual != 'none
 
 @job_def[:roles] << XP5K::Role.new({
   name: 'compute',
-  size: XP5K::Config[:computes].to_i
+  size: XP5K::Config[:computes].to_i,
+  pattern: XP5K::Config[:cluster]
 })
 
 @job_def[:roles] << XP5K::Role.new({
   name: 'injector',
-  size: XP5K::Config[:computes].to_i - 1 # XP5K::Config[:injectors].to_i
+  size: XP5K::Config[:computes].to_i, # XP5K::Config[:injectors].to_i
+  pattern: XP5K::Config[:management_cluster]
 })
 
 G5K_NETWORKS = YAML.load_file("scenarios/#{XP5K::Config[:scenario]}/g5k_networks.yml")
@@ -133,7 +171,8 @@ namespace :scenario do
       'scenario:os:network',
  #     'scenario:os:horizon',
       'scenario:os:flavors',
-      'scenario:os:images'
+      'scenario:os:images',
+      'scenario:elastica:setup'
     ]
     workflow.each do |task|
       Rake::Task[task].execute
@@ -299,6 +338,8 @@ namespace :scenario do
   task :setup do
     puts '** BEGIN ELASTICA SETUP '
     puts '---'
+    sh %{PROJECT_PATH=#{XP5K::Config[:elastica_home]} #{XP5K::Config[:elastica_home]}/deployment/usr_pwd.sh} if !File.file?("#{XP5K::Config[:elastica_home]}/tmp/pwd") or !File.file?("#{XP5K::Config[:elastica_home]}/tmp/usr")
+
     on(roles('controller','injector'), user: 'root', environment: XP5K::Config[:openstack_env]) do
         cmd = []
         cmd << %{echo 'ulimit -n 65535' >> /root/.bashrc}
@@ -367,9 +408,18 @@ namespace :scenario do
     on(roles('injector'), user: 'root', environment: XP5K::Config[:openstack_env]) do
        ["echo '#{id_rsa_ctrl}' >> /root/.ssh/authorized_keys"]
     end
-
+    sh %{echo '#{id_rsa_ctrl}' >> #{ENV['HOME']}/.ssh/authorized_keys}
+#{XP5K::Config[:elastica_home]}
+#    sh %{PROJECT_PATH=/share /share/deployment/usr_pwd.sh}
     puts '--- END ELASTICA SETUP'
   end
+  desc ''
+  task :pass do
+#    on(roles('controller'), user: 'root', environment: XP5K::Config[:openstack_env]) do
+       #cmd = []
+      # cmd
+ #   end
+  end 
  end
 
 
@@ -377,7 +427,7 @@ namespace :scenario do
   desc 'Experiment Initialization'
   task :init do
      puts "Running Experiment"
-puts "#{XP5K::Config[:openstack_env].class}"
+     puts "#{XP5K::Config[:openstack_env].class}"
      tmp_env = XP5K::Config[:openstack_env].merge(XP5K::Config[:elastica_env])
      on(roles('controller'), user: 'root', environment: tmp_env) do
 	 cmd = []

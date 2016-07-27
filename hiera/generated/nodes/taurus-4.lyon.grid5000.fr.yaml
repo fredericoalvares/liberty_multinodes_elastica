@@ -1,5 +1,0 @@
----
-classes:
-- scenario::openstack::controller
-- scenario::openstack::network
-- scenario::openstack::storage

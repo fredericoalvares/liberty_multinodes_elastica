@@ -1,9 +1,0 @@
----
-classes:
-- xp::puppet::server
-puppet::server::autosign:
-- taurus-3.lyon.grid5000.fr
-- taurus-4.lyon.grid5000.fr
-- taurus-6.lyon.grid5000.fr
-- taurus-7.lyon.grid5000.fr
-- taurus-8.lyon.grid5000.fr
