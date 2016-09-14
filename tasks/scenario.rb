@@ -5,89 +5,69 @@
 # Override OAR resources (tasks/jobs.rb)
 # We uses 2 nodes (1 puppetserver and 1 controller) and a subnet for floating public IPs
 #
-XP5K::Config[:jobname]    ||= '[openstack] elastica'
+XP5K::Config[:jobname]    ||= '[openstack]elastica'
 XP5K::Config[:site]       ||= 'lyon'
 XP5K::Config[:walltime]   ||= '1:00:00'
-XP5K::Config[:cluster]    ||= 'taurus'
+XP5K::Config[:cluster]    ||= 'lyon'
 XP5K::Config[:management_cluster] ||= 'sagittaire'
 XP5K::Config[:vlantype]   ||= 'kavlan-local'
 XP5K::Config[:computes]   ||= 1
-#XP5K::Config[:interfaces] ||= 1
-#XP5K::Config[:injectors]  ||= 1
+XP5K::Config[:interfaces] ||= 1
 XP5K::Config[:elastica_home] ||= "#{ENV['HOME']}/elastica"
-
 XP5K::Config[:elastica_env] = {:PROJECT_PATH=>"/share"}
 
-oar_cluster = ""
-oar_cluster = "and cluster='" + XP5K::Config[:cluster] + "'" if !XP5K::Config[:cluster].empty?
+oar_cluster1 = ""
+oar_cluster1 = "and cluster='" + XP5K::Config[:cluster] + "'" if !XP5K::Config[:cluster].empty?
 
+oar_cluster2 = ""
+oar_cluster2 = "cluster='" + XP5K::Config[:management_cluster] + "'" if !XP5K::Config[:management_cluster].empty?
 
 
 # vlan reservation 
 # the first interface is put in the production network
 # the other ones are put a dedicated vlan thus we need #interfaces - 1 vlans
-#oar_vlan = ""
-oar_vlan = "{type='#{XP5K::Config[:vlantype]}'}/vlan=1" 
 
-compute_nodes = XP5K::Config[:computes].to_i 
-management_nodes = 2 + XP5K::Config[:computes].to_i 
+oar_vlan = ""
+oar_vlan = "{type='#{XP5K::Config[:vlantype]}'}/vlan=#{XP5K::Config[:interfaces] - 1}" if XP5K::Config[:interfaces] >= 2
 
-oar_cluster = "{type='#{XP5K::Config[:vlantype]}'}/vlan=1+{virtual != 'none' and cluster='#{XP5K::Config[:cluster]}'}/nodes=#{compute_nodes}+slash_22=1,{cluster='#{XP5K::Config[:management_cluster]}'}/nodes=#{management_nodes},walltime=#{XP5K::Config[:walltime]}"
+#nodes = 4 + XP5K::Config[:computes].to_i
 
-#oar_cluster = "{type='#{XP5K::Config[:vlantype]}'}/vlan=1+{virtual != 'none' and cluster='#{XP5K::Config[:management_cluster]}'}/nodes=#{management_nodes}+slash_22=1,walltime=#{XP5K::Config[:walltime]}"
+compute_nodes = 4 +  XP5K::Config[:computes].to_i
+management_nodes = XP5K::Config[:computes].to_i
 
-#puts oar_cluster
-
-#resources = [] << %{{type='#{XP5K::Config[:vlantype]}'}/vlan=1+{virtual != 'none' and #{XP5K::Config[:cluster]}/nodes=#{nodes_compute}+slash_22=1,,walltime=#{XP5K::Config[:walltime]}}
-
-resources = [] << %{#{oar_cluster}}
-#nodes = 1
-
-#resources = [] << %{{type='#{XP5K::Config[:vlantype]}'}/vlan=1+{virtual != 'none' #{oar_cluster}}/nodes=#{nodes}+slash_22=1,walltime=#{XP5K::Config[:walltime]}}
-
- 
-#{type='#{XP5K::Config[:vlantype]}'}/vlan=1+{virtual != 'none' and #{XP5K::Config[:cluster]}/nodes=#{nodes_compute}+slash_22=1,,walltime=#{XP5K::Config[:walltime]}}
+#oar_cluster = "{type='#{XP5K::Config[:vlantype]}'}/vlan=1+{virtual != 'none' and cluster='#{XP5K::Config[:cluster]}'}/nodes=#{compute_nodes}+slash_22=1,{cluster='#{XP5K::Config[:management_cluster]}'}/nodes=#{management_nodes},walltime=#{XP5K::Config[:walltime]}"
 
 
+#oar_cluster = "and cluster='#{XP5K::Config[:cluster]}'}/nodes=#{compute_nodes}+slash_22=1,{cluster='#{XP5K::Config[:management_cluster]}'}/nodes=#{management_nodes}"
 
-#resources = [] << 
-#[ 
-#  "#{oar_vlan}",
-#  "#{oar_cluster}",
-#  "slash_22=1, walltime=#{XP5K::Config[:walltime]}"
-#].join("+")
-#
-#roles = []
-#XP5K::Config['clusters'].each do |cluster|
-#  roles << XP5K::Role.new({
-#    :name    => "controller",
-#    :size    => 1,
-#    :pattern => cluster['name']
-#  })
-#  roles << XP5K::Role.new({
-#    :name => "ceph_monitor_#{cluster['name']}",
-#    :size => 1,
-#    :inner => "ceph_nodes_#{cluster['name']}"
-#  })
-#end
-#
+#resources = [] << %{#{oar_cluster}}
+
+resources = [] << 
+[ 
+  "#{oar_vlan}",
+  "{eth_count >= #{XP5K::Config[:interfaces]} and virtual != 'none' #{oar_cluster1}}/nodes=#{compute_nodes}+{#{oar_cluster2}}/nodes=#{management_nodes}",
+#  "{eth_count >= #{XP5K::Config[:interfaces]} and virtual != 'none' #{oar_cluster2}}/nodes=#{management_nodes}",
+  "slash_22=1, walltime=#{XP5K::Config[:walltime]}"
+].join("+")
 
 @job_def[:resources] = resources
 @job_def[:roles] << XP5K::Role.new({
   name: 'controller',
   size: 1,
-  pattern: XP5K::Config[:management_cluster]
+  pattern: XP5K::Config[:cluster]
 })
 
-#@job_def[:roles] << XP5K::Role.new({
-#  name: 'storage',
-#  size: 1
-#})
-#
-#@job_def[:roles] << XP5K::Role.new({
-#  name: 'network',
-#  size: 1
-#})
+@job_def[:roles] << XP5K::Role.new({
+  name: 'storage',
+  size: 1,
+  pattern: XP5K::Config[:cluster]
+})
+
+@job_def[:roles] << XP5K::Role.new({
+  name: 'network',
+  size: 1,
+  pattern: XP5K::Config[:cluster]
+})
 
 @job_def[:roles] << XP5K::Role.new({
   name: 'compute',
@@ -95,18 +75,20 @@ resources = [] << %{#{oar_cluster}}
   pattern: XP5K::Config[:cluster]
 })
 
+
 @job_def[:roles] << XP5K::Role.new({
   name: 'injector',
   size: XP5K::Config[:computes].to_i, # XP5K::Config[:injectors].to_i
   pattern: XP5K::Config[:management_cluster]
 })
 
+
 G5K_NETWORKS = YAML.load_file("scenarios/#{XP5K::Config[:scenario]}/g5k_networks.yml")
 
 # Override role 'all' (tasks/roles.rb)
 #
 role 'all' do
-  roles 'puppetserver', 'controller', 'compute', 'injector'
+  roles 'puppetserver', 'controller', 'storage', 'network', 'compute', 'injector'
 end
 
 # Define OAR job (required)
@@ -135,29 +117,19 @@ namespace :scenario do
     # run controller recipes 
     # do not call rake task (due to chaining)
     puppetserver = roles('puppetserver').first
-
-
-
-    on roles('controller', 'compute','injector') do
+    on roles('controller') do
         cmd = "/opt/puppetlabs/bin/puppet agent -t --server #{puppetserver}"
         cmd += " --debug" if ENV['debug']
         cmd += " --trace" if ENV['trace']
         cmd
     end
     
-#    on roles('network', 'storage', 'compute') do
-#        cmd = "/opt/puppetlabs/bin/puppet agent -t --server #{puppetserver}"
-#        cmd += " --debug" if ENV['debug']
-#        cmd += " --trace" if ENV['trace']
-#        cmd
-#    end
-    
-#    on roles('injector') do
-#      cmd = "/opt/puppetlabs/bin/puppet agent -t --server #{puppetserver}"
-#      cmd += " --debug" if ENV['debug']
-#      cmd += " --trace" if ENV['trace']
-#      cmd
-#    end
+    on roles('network', 'storage', 'compute','injector') do
+        cmd = "/opt/puppetlabs/bin/puppet agent -t --server #{puppetserver}"
+        cmd += " --debug" if ENV['debug']
+        cmd += " --trace" if ENV['trace']
+        cmd
+    end
 
     Rake::Task['scenario:bootstrap'].execute
   end
@@ -169,16 +141,21 @@ namespace :scenario do
       'scenario:os:rules',
       'scenario:os:public_bridge',
       'scenario:os:network',
- #     'scenario:os:horizon',
-      'scenario:os:flavors',
+     # 'scenario:os:horizon',
+     # 'scenario:os:flavors',
       'scenario:os:images',
-      'scenario:elastica:setup'
+      'scenario:elastica:setup',
+      'scenario:elastica:images',
+      'scenario:elastica:run'
     ]
     workflow.each do |task|
       Rake::Task[task].execute
     end
  end
- namespace :hiera do
+  
+
+  namespace :hiera do
+
     desc 'update common.yaml with network information (controller/storage ips, networks adresses)'
     task :update do
       update_common_with_networks()
@@ -187,7 +164,8 @@ namespace :scenario do
       sh %{cd scenarios/#{XP5K::Config[:scenario]}/hiera/generated && tar -cf - . | ssh#{SSH_CONFIGFILE_OPT} root@#{puppetserver_fqdn} 'cd /etc/puppetlabs/code/environments/production/hieradata && tar xf -'}
     end
   end
- namespace :os do
+
+  namespace :os do
 
     desc 'Update default security group rules'
     task :fix_proxy do
@@ -198,14 +176,14 @@ namespace :scenario do
 
     desc 'Update default security group rules'
     task :rules do
-      on(roles('controller'), user: 'root', environment: XP5K::Config[:openstack_env]) do
+      on(roles('controller'), user: 'root', environment: XP5K::Config[:openstack_env]) do 
         # Add SSH rule
         cmd = [] << 'nova secgroup-add-rule default tcp 22 22 0.0.0.0/0'
         # Add http rule
         cmd << 'nova secgroup-add-rule default tcp 80 80 0.0.0.0/0'
         # Add ICMP rule
         cmd << 'nova secgroup-add-rule default icmp -1 -1 0.0.0.0/0'
-	cmd << 'nova secgroup-create sec_group \' default security goup\''
+        cmd << 'nova secgroup-create sec_group \' default security goup\''
         cmd << 'nova secgroup-add-rule sec_group tcp 1 65535 0.0.0.0/0'
         cmd << 'nova secgroup-add-rule sec_group icmp -1 -1 0.0.0.0/0'
         cmd
@@ -214,34 +192,17 @@ namespace :scenario do
 
     desc 'Configure public bridge'
     task :public_bridge do
-      controllerHostname = roles('controller').first.split('.').first
-      clusterName = controllerHostname.split('-').first
-      restfullyDatas = xp.connection.root
-      .sites[XP5K::Config[:site].to_sym]
-      .clusters[clusterName.to_sym]
-      .nodes.select { |i| i['uid'] == controllerHostname }.first
-      device = restfullyDatas['network_adapters'].select { |interface|
-        interface['mounted'] == true
-      }.first['device']
-      on(roles('controller'), user: 'root') do
+      on(roles('network'), user: 'root') do
+        interfaces = get_node_interfaces
+        network = roles('network').first
+        device = interfaces[network]["public"]["device"]
         %{ ovs-vsctl add-port br-ex #{device} && ip addr flush #{device} && dhclient -nw br-ex }
       end
     end
 
-#    desc 'Configure public bridge'
-#    task :public_bridge do
-##      on(roles('network'), user: 'root') do
-#       on(roles('controller'), user: 'root') do
-#        interfaces = get_node_interfaces
-#        network = roles('controller').first
-#        device = interfaces[network]["public"]["device"]
-#        %{ ovs-vsctl add-port br-ex #{device} && ip addr flush #{device} && dhclient -nw br-ex }
-#      end
-#
-#    end
-
     desc 'Configure Openstack network'
     task :network do
+
       publicSubnet = G5K_NETWORKS[XP5K::Config[:site]]["subnet"]
       reservedSubnet = xp.job_with_name(XP5K::Config[:jobname])['resources_by_type']['subnets'].first
       publicPool = IPAddr.new(reservedSubnet).to_range.to_a[10..100]
@@ -276,9 +237,9 @@ namespace :scenario do
         [
 #           %{/usr/bin/wget -q -O /tmp/cirros.img http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img},
 #           %{glance image-create --name="Cirros" --disk-format=qcow2 --container-format=bare --property architecture=x86_64 --progress --file /tmp/cirros.img},
- #          %{/usr/bin/wget -q -O /tmp/debian.img http://cdimage.debian.org/cdimage/openstack/8.3.0/debian-8.3.0-openstack-amd64.qcow2},
- #          %{glance image-create --name="Debian Jessie 64-bit" --disk-format=qcow2 --container-format=bare --property architecture=x86_64 --progress --file /tmp/debian.img}
-            %{/usr/bin/wget -q -O /tmp/ubuntu.img https://cloud-images.ubuntu.com/releases/12.04.4/release-20120424/ubuntu-12.04-server-cloudimg-amd64-disk1.img},
+#           %{/usr/bin/wget -q -O /tmp/debian.img http://cdimage.debian.org/cdimage/openstack/8.3.0/debian-8.3.0-openstack-amd64.qcow2},
+#           %{glance image-create --name="Debian Jessie 64-bit" --disk-format=qcow2 --container-format=bare --property architecture=x86_64 --progress --file /tmp/debian.img}
+%{/usr/bin/wget -q -O /tmp/ubuntu.img https://cloud-images.ubuntu.com/releases/12.04.4/release-20120424/ubuntu-12.04-server-cloudimg-amd64-disk1.img},
            %{glance image-create --name="Ubuntu 12.04" --disk-format=qcow2 --container-format=bare --property architecture=x86_64 --progress --file /tmp/ubuntu.img}
         ]
       end
@@ -287,13 +248,7 @@ namespace :scenario do
     desc 'Add flavors'
     task :flavors do
       on(roles('controller'), user: 'root', environment: XP5K::Config[:openstack_env]) do
-      [ ]
-       # %{nova flavor-create m1.tiny 1 512 0 1 --is-public True},
-       # %{nova flavor-create m1.small 2 2048 10 1 --is-public True},
-       # %{nova flavor-create m1.medium 3 4096 10 2 --is-public True},
-       # %{nova flavor-create m1.large 4 8096 10 4 --is-public True},
-       # %{nova flavor-create m1.xlarge 5 16384 10 8 --is-public True} ]
-      #  %{nova flavor-create m1.xs auto 2048 6 2 --is-public True}
+        %{nova flavor-create m1.xs auto 2048 6 2 --is-public True}
       end
     end
 
@@ -311,48 +266,30 @@ namespace :scenario do
         puts "Patch not applied."
       end
     end
- end
-
- # desc 'Show SSH configuration to access Horizon'
- # task :horizon_access do
- #   puts '** Launch this script on your local computer and open http://localhost:8080 on your navigator'
- #   puts '---'
- #   script = %{cat > /tmp/openstack_ssh_config <<EOF\n}
- #   script += %{Host *.grid5000.fr\n}
- #   script += %{  User #{ENV['USER']}\n}
- #   script += %{  ProxyCommand ssh -q #{ENV['USER']}@194.254.60.4 nc -w1 %h %p # Access South\n}
- #   script += %{EOF\n}
- #   script += %{ssh -F /tmp/openstack_ssh_config -N -L 8080:#{roles('controller').first}:8080 #{ENV['USER']}@frontend.#{XP5K::Config[:site]}.grid5000.fr &\n}
- #   script += %{HTTP_PID=$!\n}
- #   script += %{ssh -F /tmp/openstack_ssh_config -N -L 6080:#{roles('controller').first}:6080 #{ENV['USER']}@frontend.#{XP5K::Config[:site]}.grid5000.fr &\n}
- #   script += %{CONSOLE_PID=$!\n}
- #   script += %{trap 'kill -9 $HTTP_PID && kill -9 $CONSOLE_PID' 2\n}
- #   script += %{echo 'http://localhost:8080'\n}
- #   script += %{wait\n}
- #   puts script
- #   puts '---'
- # end
-
- namespace :elastica do
+  end
+  namespace :elastica do
   desc 'Elastica Setup'
   task :setup do
     puts '** BEGIN ELASTICA SETUP '
     puts '---'
     sh %{PROJECT_PATH=#{XP5K::Config[:elastica_home]} #{XP5K::Config[:elastica_home]}/deployment/usr_pwd.sh} if !File.file?("#{XP5K::Config[:elastica_home]}/tmp/pwd") or !File.file?("#{XP5K::Config[:elastica_home]}/tmp/usr")
 
-    on(roles('controller','injector'), user: 'root', environment: XP5K::Config[:openstack_env]) do
+    on(roles('injector'), user: 'root', environment: XP5K::Config[:openstack_env]) do
         cmd = []
         cmd << %{echo 'ulimit -n 65535' >> /root/.bashrc}
-        cmd << %{echo 'fs.file-max =  100000' >> /etc/sysctl.conf}
-        cmd << %{echo 'net.ipv4.ip_local_port_range=\"1025 65535\"' >> /etc/sysctl.conf}
-        cmd << %{echo '*    soft     nofile   65536' >> /etc/security/limits.conf}
-        cmd << %{echo '*    hard     nofile   65536' >> /etc/security/limits.conf}
+        cmd << %{echo 'fs.file-max =  300000' >> /etc/sysctl.conf}
+        cmd << %{echo 'fs.nr_open =  300000' >> /etc/sysctl.conf}
+        cmd << %{echo 'net.ipv4.ip_local_port_range = 1025 65535' >> /etc/sysctl.conf}
+        cmd << %{echo 'root   soft     nofile   65536' >> /etc/security/limits.conf}
+        cmd << %{echo 'root   hard     nofile   65536' >> /etc/security/limits.conf}
         cmd << %{echo 'session    required   pam_limits.so' >> /etc/pam.d/common-session}
         cmd << %{echo 'session    required   pam_limits.so' >> /etc/pam.d/common-session-noninteractive}
+        cmd << %{echo 'session    required   pam_limits.so' >> /etc/pam.d/sshd}
+	cmd << %{sed -i.bak 's/^.*UseLogin.*$/UseLogin yes/g' /etc/ssh/sshd_config}
         cmd << %{echo 300000 | sudo tee /proc/sys/fs/nr_open}
         cmd << %{echo 300000 | sudo tee /proc/sys/fs/file-max}
         cmd << %{sysctl -p}
-        cmd << %{apt-get -y install openjdk-7-jre-headless}
+        cmd << %{apt-get -y install openjdk-7-jre-headless vim bc}
         cmd
     end
 
@@ -363,21 +300,14 @@ namespace :scenario do
     end
     on(roles('controller'), user: 'root', environment: XP5K::Config[:openstack_env]) do
         cmd = []
-#        cmd << %{echo 'export OS_USERNAME=admin' > ~/adminrc.sh}
-#        cmd << %{echo 'export OS_PASSWORD=admin' >> ~/adminrc.sh}
-#        cmd << %{echo 'OS_TENANT_NAME=openstack' >> ~/adminrc.sh}
-#        cmd << %{echo 'OS_AUTH_URL=http://127.0.0.1:5000/v2.0' >> ~/adminrc.sh}
         cmd << %{cp  ~/adminrc ~/openrc}
         cmd << %{echo 'source ~/adminrc' >> ~/.bashrc}
         cmd << %{echo 'export PROJECT_PATH=/share' >> /root/.bashrc}
-#        cmd << %{apt-get -y install portmap nfs-common nfs-kernel-server}
         cmd << %{mkdir /share}
         cmd << %{chmod 777 /share}
-#        cmd << %{echo '/share *(ro)' >> /etc/exports}
-#        cmd << %{service nfs-kernel-server restart}
+        cmd << %{apt-get -y install openjdk-7-jre-headless vim bc}
         cmd
     end
-
     controllerserver = roles('controller').first
     sh %{scp -r #{XP5K::Config[:elastica_home]}/* root@#{controllerserver}:/share/}
     logstash = "logstash-1.4.2"
@@ -385,14 +315,14 @@ namespace :scenario do
 
     on(roles('controller'), user: 'root', environment: XP5K::Config[:openstack_env]) do
         cmd = []
-        cmd << %{nova quota-class-update --instances 50 default}
-        cmd << %{nova quota-class-update --cores 50 default}
+        cmd << %{nova quota-class-update --instances -1 default}
+        cmd << %{nova quota-class-update --cores -1 default}
         cmd << %{nova quota-class-update --ram -1 default}
-        cmd << %{nova quota-class-update --floating_ips -1 default}
-        cmd << %{nova quota-class-update --metadata_items -1 default}
-        cmd << %{nova quota-class-update --injected_files -1 default}
-        cmd << %{nova quota-class-update --injected_file_content_bytes -1 default}
-        cmd << %{nova quota-class-update --injected_file_path_bytes -1 default}
+        cmd << %{nova quota-class-update --floating-ips -1 default}
+        cmd << %{nova quota-class-update --metadata-items -1 default}
+        cmd << %{nova quota-class-update --injected-files -1 default}
+        cmd << %{nova quota-class-update --injected-file-content-bytes -1 default}
+        cmd << %{nova quota-class-update --injected-file-path-bytes -1 default}
         cmd << %{sed -i 's/^\\(export ADRESSE_IP_SERVER_REDIS\\)=.*$/\\1='$(ifconfig br-ex | grep "inet addr" | cut -d ':' -f2 | cut -d ' ' -f1)'/g' /share/common/util.sh}
         cmd << %{ssh-keygen -f /tmp/id_rsa -t rsa -N ''}
         cmd << %{nova keypair-add --pub_key /tmp/id_rsa.pub key}
@@ -404,100 +334,49 @@ namespace :scenario do
         cmd
     end
     id_rsa_ctrl=`ssh root@#{controllerserver} "cat /tmp/id_rsa.pub"`
-#    puts "#{id_rsa_ctrl}"
     on(roles('injector'), user: 'root', environment: XP5K::Config[:openstack_env]) do
        ["echo '#{id_rsa_ctrl}' >> /root/.ssh/authorized_keys"]
     end
     sh %{echo '#{id_rsa_ctrl}' >> #{ENV['HOME']}/.ssh/authorized_keys}
-#{XP5K::Config[:elastica_home]}
-#    sh %{PROJECT_PATH=/share /share/deployment/usr_pwd.sh}
     puts '--- END ELASTICA SETUP'
   end
-  desc ''
-  task :pass do
-#    on(roles('controller'), user: 'root', environment: XP5K::Config[:openstack_env]) do
-       #cmd = []
-      # cmd
- #   end
-  end 
- end
-
-
- namespace :experiment do
-  desc 'Experiment Initialization'
-  task :init do
-     puts "Running Experiment"
-     puts "#{XP5K::Config[:openstack_env].class}"
-     tmp_env = XP5K::Config[:openstack_env].merge(XP5K::Config[:elastica_env])
-     on(roles('controller'), user: 'root', environment: tmp_env) do
-	 cmd = []
-         (1..XP5K::Config[:computes].to_i).each do |i|
-                compute = roles('compute').at(i-1)
-
-		puts "#{XP5K::Config[:openstack_env]}"
-
-		puts "Launching DB on host #{compute}"
-   		cmd << %{/share/apicloud/new_vm.sh 4 db-rubis#{i} db dbtier#{i} #{compute}}
-		
-		cmd << %{nova list | grep db-rubis#{i} | tr "|" " " |tr -s " " | cut -d ' ' -f8 > /tmp/dbinfo}	
-	
-		puts "Scaling tier#{i} on host #{compute}"
-		cmd << %{/share/apicloud/scale-iaas.sh out tier#{i} #{compute}}
-         end   
-         cmd
-     end
-  end
   
-  desc 'Experiment Infrastructure Destruction'
-  task :destroy do
-     puts "Experiment Destroy"
-     
-     tmp_env = XP5K::Config[:openstack_env].merge(XP5K::Config[:elastica_env])
-     
-     on(roles('controller'), user: 'root', environment: tmp_env) do
-	cmd = []
-        cmd << %{nova list | awk '$2 && $2 != "ID" {print $2}' | xargs -n1 sh -c 'nova delete'}
-	cmd << %{rm -rf /tier}
-	cmd << %{echo '#!/bin/bash' > /root/action.sh}
-        cmd << %{echo "echo \$0 \$1" >> /root/action.sh}
-        cmd << %{echo "source $PROJECT_PATH/common/util.sh" >> /root/action.sh}
-        cmd << %{chmod +x /root/action.sh}
-        cmd
-     end
-  end
-  
-  desc 'Experiment Infrastructure Destruction'
-  task :run do
-     puts "Experiment Run"
+  desc 'Elastica Set'
+  task :images do
+    puts '**** CREATING IMAGES *****'
      on(roles('controller'), user: 'root', environment: XP5K::Config[:openstack_env]) do
-	cmd = []
-        cmd << %{unset http_proxy}
-	cmd << %{unset https_proxy}
-	cmd << %{echo "log_cloud_state b_\$1" >> /root/action.sh}
-        cmd << %{echo "$PROJECT_PATH/apicloud/strategies/$strategy.sh \$1 tier" >> /root/action.sh}
-        cmd << %{echo "log_cloud_state e_\$1" >> /root/action.sh}
-        cmd << %{chmod +x /root/action.sh}
+	cmd = []  
+        cmd << %{PROJECT_PATH=/share /share/apicloud/create_disk_images.sh LB} 
+        cmd << %{PROJECT_PATH=/share /share/apicloud/create_disk_images.sh w}
+        cmd << %{PROJECT_PATH=/share /share/apicloud/create_disk_images.sh db}
         cmd
      end
+    puts '**** END OF IMAGE CREATION ****'
   end
-
+  desc 'Elastica Setup'
+  task :run do
+    puts '**** BEGINNING OF EXPERIMENT *****'
+     on(roles('controller'), user: 'root', environment: XP5K::Config[:openstack_env]) do
+	cmd = []  
+        cmd << %{PROJECT_PATH=/share /share/experiments/rubis_energy_ls/scripts/bench.sh} 
+        cmd
+     end
+    puts '**** END OF EXPERIMENT ****'
+  end
 
  end
 end
-
-
-  
 def update_common_with_networks
   interfaces = get_node_interfaces
   common = YAML.load_file("scenarios/#{XP5K::Config[:scenario]}/hiera/generated/common.yaml")
   common['scenario::openstack::admin_password'] = XP5K::Config[:openstack_env][:OS_PASSWORD]
 
-#  common = YAML.load_file("scenarios/#{XP5K::Config[:scenario]}/hiera/generated/common.yaml")
-#  vlanids = xp.job_with_name("#{XP5K::Config[:jobname]}")['resources_by_type']['vlans']
+  common = YAML.load_file("scenarios/#{XP5K::Config[:scenario]}/hiera/generated/common.yaml")
+  vlanids = xp.job_with_name("#{XP5K::Config[:jobname]}")['resources_by_type']['vlans']
 
   controller = roles('controller').first
   common['scenario::openstack::controller_public_address'] = interfaces[controller]["public"]["ip"]
-  storage = controller #roles('storage').first
+  storage = roles('storage').first
   common['scenario::openstack::storage_public_address'] = interfaces[storage]["public"]["ip"]
 
   # each specific OpenStack network is picked in the reserved vlan
@@ -505,17 +384,15 @@ def update_common_with_networks
   # TODO handle more than 1 vlan 
   # 1 for management (in this implementation management is the same as public)
   # 1 for data 
-#  ['data_network'].each_with_index do |network, i| 
-   # if (XP5K::Config[:interfaces] > 1)
-   #  common["scenario::openstack::#{network}"] = G5K_NETWORKS[XP5K::Config[:site]]["vlans"][vlanids[i % vlanids.size].to_i]
-   # else
-#     common["scenario::openstack::#{network}"] = G5K_NETWORKS[XP5K::Config[:site]]["production"]
-   # end
-#  end
+  ['data_network'].each_with_index do |network, i| 
+    if (XP5K::Config[:interfaces] > 1)
+     common["scenario::openstack::#{network}"] = G5K_NETWORKS[XP5K::Config[:site]]["vlans"][vlanids[i % vlanids.size].to_i]
+    else
+     common["scenario::openstack::#{network}"] = G5K_NETWORKS[XP5K::Config[:site]]["production"]
+    end
+  end
 
-  common['scenario::openstack::network'] = G5K_NETWORKS[XP5K::Config[:site]]['production']
- # common['scenario::openstack::network'] = G5K_NETWORKS[XP5K::Config[:site]]['production']
- # common['scenario::openstack::public_network'] = G5K_NETWORKS[XP5K::Config[:site]]["production"]
+  common['scenario::openstack::public_network'] = G5K_NETWORKS[XP5K::Config[:site]]["production"]
 
   File.open("scenarios/#{XP5K::Config[:scenario]}/hiera/generated/common.yaml", 'w') do |file|
     file.puts common.to_yaml

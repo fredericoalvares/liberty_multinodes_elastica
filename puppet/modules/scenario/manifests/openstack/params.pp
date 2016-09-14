@@ -4,22 +4,21 @@
 
 class scenario::openstack::params {
 
-  $admin_password 	     = 'admin'
-  $primary_interface         = 'eth0'
+  $admin_password = 'admin'
+
   $controller_public_address = hiera("scenario::openstack::controller_public_address")
-  $storage_public_address    = hiera("scenario::openstack::storage_public_address")
+  $storage_public_address = hiera("scenario::openstack::storage_public_address")
 
- # $public_network = hiera("scenario::openstack::public_network")
- # $data_network = hiera("scenario::openstack::data_network")
+  $public_network = hiera("scenario::openstack::public_network")
+  $data_network = hiera("scenario::openstack::data_network")
 
-   $network = hiera("scenario::openstack::network")
 
   case $::osfamily {
     'Debian': {
       include ::apt
       class { '::openstack_extras::repo::debian::ubuntu':
         release         => 'liberty',
-        repo            => 'proposed',
+        repo            => 'updates',
         package_require => true,
       }
       $package_provider = 'apt'

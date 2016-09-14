@@ -5,8 +5,7 @@
 class scenario::openstack::network (
   String $admin_password = $scenario::openstack::params::admin_password,
   String $controller_public_address = $scenario::openstack::params::controller_public_address,
- # String $data_network = $scenario::openstack::params::data_network
- # String $network = $scenario::openstack::params::network
+  String $data_network = $scenario::openstack::params::data_network
 ) inherits scenario::openstack::params {
 
 
@@ -14,40 +13,9 @@ class scenario::openstack::network (
     controller_public_address => $controller_public_address
   }
 
-  class { '::neutron::db::mysql':
-    password => 'neutron',
-    # TODO be more restrictive on the grants
-    allowed_hosts => ['localhost', '127.0.0.1', '%']
-  }
-  class { '::neutron::keystone::auth':
-    password     => $admin_password,
-    public_url   => "http://${controller_public_address}:9696",
-    internal_url => "http://${controller_public_address}:9696",
-    admin_url    => "http://${controller_public_address}:9696"
-  }
-
-  class { '::neutron::client': }
-  class { '::neutron::server':
-    database_connection => "mysql://neutron:neutron@${controller_public_address}/neutron?charset=utf8",
-    auth_password       => $admin_password,
-    identity_uri        => "http://${controller_public_address}:35357/",
-    auth_uri            => "http://${controller_public_address}:5000",
-    sync_db             => true,
-  }
-
-  class { '::neutron::server::notifications':
-    username    => 'nova',
-    tenant_name => 'services',
-    password    => $admin_password,
-    nova_url    => "http://${controller_public_address}:8774/v2",
-    auth_url    => "http://${controller_public_address}:35357",
-    region_name => "RegionOne"
-  }
-
   class { '::neutron::agents::ml2::ovs':
     enable_tunneling => true,
-    local_ip         => $controller_public_address,
-    #local_ip         => ip_for_network($data_network),
+    local_ip         => ip_for_network($data_network),
     tunnel_types     => ['vxlan'],
     bridge_mappings  => ["public:br-ex"],
   }
