@@ -305,7 +305,7 @@ namespace :scenario do
         cmd << %{echo 'export PROJECT_PATH=/share' >> /root/.bashrc}
         cmd << %{mkdir /share}
         cmd << %{chmod 777 /share}
-        cmd << %{apt-get -y install openjdk-7-jre-headless vim bc}
+        cmd << %{apt-get -y install openjdk-7-jre-headless vim bc make gcc}
         cmd
     end
     controllerserver = roles('controller').first
@@ -323,7 +323,7 @@ namespace :scenario do
         cmd << %{nova quota-class-update --injected-files -1 default}
         cmd << %{nova quota-class-update --injected-file-content-bytes -1 default}
         cmd << %{nova quota-class-update --injected-file-path-bytes -1 default}
-        cmd << %{sed -i 's/^\\(export ADRESSE_IP_SERVER_REDIS\\)=.*$/\\1='$(ifconfig br-ex | grep "inet addr" | cut -d ':' -f2 | cut -d ' ' -f1)'/g' /share/common/util.sh}
+        cmd << %{sed -i 's/^\\(export ADRESSE_IP_SERVER_REDIS\\)=.*$/\\1='$(ifconfig eth0 | grep "inet addr" | cut -d ':' -f2 | cut -d ' ' -f1)'/g' /share/common/util.sh}
         cmd << %{ssh-keygen -f /tmp/id_rsa -t rsa -N ''}
         cmd << %{nova keypair-add --pub_key /tmp/id_rsa.pub key}
         cmd << %{chmod +x /share/software_resources/redis/install.sh}
