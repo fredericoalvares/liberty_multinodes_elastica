@@ -12,6 +12,7 @@ XP5K::Config[:cluster]    ||= 'lyon'
 XP5K::Config[:management_cluster] ||= 'sagittaire'
 XP5K::Config[:vlantype]   ||= 'kavlan-local'
 XP5K::Config[:computes]   ||= 1
+XP5K::Config[:applications]   ||= 1
 XP5K::Config[:interfaces] ||= 1
 XP5K::Config[:elastica_home] ||= "#{ENV['HOME']}/elastica"
 XP5K::Config[:elastica_env] = {:PROJECT_PATH=>"/share"}
@@ -33,7 +34,7 @@ oar_vlan = "{type='#{XP5K::Config[:vlantype]}'}/vlan=#{XP5K::Config[:interfaces]
 #nodes = 4 + XP5K::Config[:computes].to_i
 
 compute_nodes = 4 +  XP5K::Config[:computes].to_i
-management_nodes = XP5K::Config[:computes].to_i
+management_nodes = XP5K::Config[:applications].to_i
 
 #oar_cluster = "{type='#{XP5K::Config[:vlantype]}'}/vlan=1+{virtual != 'none' and cluster='#{XP5K::Config[:cluster]}'}/nodes=#{compute_nodes}+slash_22=1,{cluster='#{XP5K::Config[:management_cluster]}'}/nodes=#{management_nodes},walltime=#{XP5K::Config[:walltime]}"
 
@@ -78,7 +79,7 @@ resources = [] <<
 
 @job_def[:roles] << XP5K::Role.new({
   name: 'injector',
-  size: XP5K::Config[:computes].to_i, # XP5K::Config[:injectors].to_i
+  size: XP5K::Config[:applications].to_i, # XP5K::Config[:injectors].to_i
   pattern: XP5K::Config[:management_cluster]
 })
 
@@ -114,6 +115,13 @@ namespace :scenario do
     Rake::Task['scenario:os:patch'].execute
     Rake::Task['puppet:modules:upload'].execute
 
+
+    # disable hyperthreading
+    on roles('compute') do
+        cmd = "for i in $(cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list | cut -d ',' -f 2 | sort -u); do echo 0 > /sys/devices/system/cpu/cpu$i/online; done"
+        cmd
+    end
+
     # run controller recipes 
     # do not call rake task (due to chaining)
     puppetserver = roles('puppetserver').first
@@ -145,8 +153,8 @@ namespace :scenario do
      # 'scenario:os:flavors',
       'scenario:os:images',
       'scenario:elastica:setup',
-      'scenario:elastica:images',
-      'scenario:elastica:run'
+      'scenario:elastica:images' #,
+#      'scenario:elastica:run'
     ]
     workflow.each do |task|
       Rake::Task[task].execute
@@ -349,6 +357,7 @@ namespace :scenario do
         cmd << %{PROJECT_PATH=/share /share/apicloud/create_disk_images.sh LB} 
         cmd << %{PROJECT_PATH=/share /share/apicloud/create_disk_images.sh w}
         cmd << %{PROJECT_PATH=/share /share/apicloud/create_disk_images.sh db}
+        cmd << %{PROJECT_PATH=/share /share/apicloud/create_disk_images.sh lamp}
         cmd
      end
     puts '**** END OF IMAGE CREATION ****'
