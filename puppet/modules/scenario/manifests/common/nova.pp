@@ -27,5 +27,14 @@ class scenario::common::nova (
 #    vif_plugging_is_fatal => false,
 #    vif_plugging_timeout  => '10',
   }
+
+
+  nova_config { 
+    'DEFAULT/cpu_allocation_ratio' : value => 1.0;
+    'DEFAULT/ram_allocation_ratio' : value => 1.0;
+#    'DEFAULT/scheduler_weight_classes' : value => nova.scheduler.weights.all_weighers;
+    'DEFAULT/ram_weight_multiplier' : value => -1.0;
+  } 
+
 }
 
