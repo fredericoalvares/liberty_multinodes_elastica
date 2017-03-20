@@ -24,16 +24,21 @@ class scenario::common::nova (
     neutron_admin_password => $admin_password,
     neutron_admin_auth_url => "http://${controller_public_address}:35357/v2.0",
     neutron_url => "http://${controller_public_address}:9696",
-#    vif_plugging_is_fatal => false,
-#    vif_plugging_timeout  => '10',
+ #   vif_plugging_is_fatal => false,
+ #   vif_plugging_timeout  => '0',
   }
 
 
-  nova_config { 
+  nova_config {
+    'DEFAULT/scheduler_default_filters' : value => 'NumInstancesFilter,RetryFilter,AvailabilityZoneFilter,RamFilter,ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter';
+#    'DEFAULT/scheduler_available_filters' : value => 'nova.scheduler.filters.NumInstancesFilter';
+    'DEFAULT/max_instances_per_host' : value => '4';
     'DEFAULT/cpu_allocation_ratio' : value => 1.0;
     'DEFAULT/ram_allocation_ratio' : value => 1.0;
 #    'DEFAULT/scheduler_weight_classes' : value => nova.scheduler.weights.all_weighers;
     'DEFAULT/ram_weight_multiplier' : value => -1.0;
+#    'DEFAULT/vif_plugging_is_fatal': value => false;
+#    'DEFAULT/vif_plugging_timeout': value => 0;
   } 
 
 }

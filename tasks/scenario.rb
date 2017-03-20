@@ -117,10 +117,10 @@ namespace :scenario do
 
 
     # disable hyperthreading
-    on roles('compute') do
-        cmd = "for i in $(cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list | cut -d ',' -f 2 | sort -u); do echo 0 > /sys/devices/system/cpu/cpu$i/online; done"
-        cmd
-    end
+   # on roles('compute') do
+   #     cmd = "for i in $(cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list | cut -d ',' -f 2 | sort -u); do echo 0 > /sys/devices/system/cpu/cpu$i/online; done"
+   #     cmd
+   # end
 
     # run controller recipes 
     # do not call rake task (due to chaining)
@@ -323,6 +323,7 @@ namespace :scenario do
 
     on(roles('controller'), user: 'root', environment: XP5K::Config[:openstack_env]) do
         cmd = []
+        cmd << %{ssh-keygen -f /tmp/id_rsa -t rsa -N ''}
         cmd << %{nova quota-class-update --instances -1 default}
         cmd << %{nova quota-class-update --cores -1 default}
         cmd << %{nova quota-class-update --ram -1 default}
@@ -332,7 +333,6 @@ namespace :scenario do
         cmd << %{nova quota-class-update --injected-file-content-bytes -1 default}
         cmd << %{nova quota-class-update --injected-file-path-bytes -1 default}
         cmd << %{sed -i 's/^\\(export ADRESSE_IP_SERVER_REDIS\\)=.*$/\\1='$(ifconfig eth0 | grep "inet addr" | cut -d ':' -f2 | cut -d ' ' -f1)'/g' /share/common/util.sh}
-        cmd << %{ssh-keygen -f /tmp/id_rsa -t rsa -N ''}
         cmd << %{nova keypair-add --pub_key /tmp/id_rsa.pub key}
         cmd << %{chmod +x /share/software_resources/redis/install.sh}
         cmd << %{PROJECT_PATH=/share /share/software_resources/redis/install.sh}

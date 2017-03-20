@@ -2,7 +2,7 @@
 classes:
 - xp
 - xp::locales
-scenario::openstack::controller_public_address: 172.16.72.10
-scenario::openstack::storage_public_address: 172.16.72.14
-scenario::openstack::data_network: 172.16.64.0/20
-scenario::openstack::public_network: 172.16.64.0/20
+scenario::openstack::controller_public_address: 172.16.96.1
+scenario::openstack::storage_public_address: 172.16.96.17
+scenario::openstack::data_network: 172.16.96.0/20
+scenario::openstack::public_network: 172.16.96.0/20
