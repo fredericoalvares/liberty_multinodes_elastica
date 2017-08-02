@@ -241,13 +241,18 @@ namespace :scenario do
 
     desc 'Get images'
     task :images do
+      controllerserver = roles('controller').first
+      sh %{scp ~/ubuntu-12.04-server-cloudimg-amd64-disk1.img root@#{controllerserver}:/tmp/ubuntu.img}
+ 
+
+
       on(roles('controller'), user: 'root', environment: XP5K::Config[:openstack_env]) do
         [
 #           %{/usr/bin/wget -q -O /tmp/cirros.img http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img},
 #           %{glance image-create --name="Cirros" --disk-format=qcow2 --container-format=bare --property architecture=x86_64 --progress --file /tmp/cirros.img},
 #           %{/usr/bin/wget -q -O /tmp/debian.img http://cdimage.debian.org/cdimage/openstack/8.3.0/debian-8.3.0-openstack-amd64.qcow2},
 #           %{glance image-create --name="Debian Jessie 64-bit" --disk-format=qcow2 --container-format=bare --property architecture=x86_64 --progress --file /tmp/debian.img}
-%{/usr/bin/wget -q -O /tmp/ubuntu.img https://cloud-images.ubuntu.com/releases/12.04.4/release-20120424/ubuntu-12.04-server-cloudimg-amd64-disk1.img},
+#%{/usr/bin/wget -q -O /tmp/ubuntu.img https://cloud-images.ubuntu.com/releases/12.04.4/release-20120424/ubuntu-12.04-server-cloudimg-amd64-disk1.img},
            %{glance image-create --name="Ubuntu 12.04" --disk-format=qcow2 --container-format=bare --property architecture=x86_64 --progress --file /tmp/ubuntu.img}
         ]
       end
@@ -355,8 +360,8 @@ namespace :scenario do
      on(roles('controller'), user: 'root', environment: XP5K::Config[:openstack_env]) do
 	cmd = []  
         cmd << %{PROJECT_PATH=/share /share/apicloud/create_disk_images.sh LB} 
-        cmd << %{PROJECT_PATH=/share /share/apicloud/create_disk_images.sh w}
-        cmd << %{PROJECT_PATH=/share /share/apicloud/create_disk_images.sh db}
+#        cmd << %{PROJECT_PATH=/share /share/apicloud/create_disk_images.sh w}
+#        cmd << %{PROJECT_PATH=/share /share/apicloud/create_disk_images.sh db}
         cmd << %{PROJECT_PATH=/share /share/apicloud/create_disk_images.sh lamp}
         cmd
      end
